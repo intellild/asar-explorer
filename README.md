@@ -38,7 +38,7 @@ Monaco 按需加载；文本预览上限为 2 MiB，图片预览上限为 20 MiB
 2. 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
 3. 在 Actions 中运行 **Deploy GitHub Pages**。
 
-工作流从 `actions/configure-pages` 读取实际子路径。例如 `owner/asar-explorer` 会使用 `/asar-explorer/`，而 `owner/owner.github.io` 会使用 `/`。本地可用同样的配置验证项目站点：
+工作流根据仓库名称计算 github.io 子路径，构建与测试不依赖 Pages 是否已启用。部署阶段通过 `actions/configure-pages` 检查 Pages 设置。例如 `owner/asar-explorer` 会使用 `/asar-explorer/`，而 `owner/owner.github.io` 会使用 `/`。本地可用同样的配置验证项目站点：
 
 ```sh
 PUBLIC_BASE_PATH=/asar-explorer/ pnpm build

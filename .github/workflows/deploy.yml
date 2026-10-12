@@ -13,6 +13,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PUBLIC_BASE_PATH: ${{ endsWith(github.event.repository.name, '.github.io') && '/' || format('/{0}/', github.event.repository.name) }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,17 +22,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/configure-pages@v5
-        id: pages
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
-        env:
-          PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-        env:
-          PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/client
@@ -41,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - uses: actions/configure-pages@v5
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
