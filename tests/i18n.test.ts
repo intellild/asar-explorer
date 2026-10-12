@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@rstest/core";
 import { readFileSync } from "node:fs";
 import { createInstance } from "i18next";
 import { parse } from "smol-toml";

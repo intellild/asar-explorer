@@ -199,7 +199,16 @@ test("language switching preserves previews, translates existing errors, and per
     .filter({ hasText: "package.json" })
     .click();
   await expect(page.locator(".view-lines")).toContainText("hello-electron");
-  await page.getByRole("combobox", { name: "语言" }).selectOption("en");
+  const languageSelect = page.getByRole("combobox", { name: "语言" });
+  await languageSelect.press("ArrowDown");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/language-menu.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("option", { name: "English", exact: true })
+    .press("Enter");
   await expect(
     page.getByRole("button", { name: "Download", exact: true }),
   ).toBeVisible();
@@ -222,11 +231,13 @@ test("language switching preserves previews, translates existing errors, and per
   await expect(
     page.getByTestId("file-row").filter({ hasText: "external.node" }),
   ).toContainText("External");
-  await page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN");
+  await page.getByRole("combobox", { name: "Language" }).click();
+  await page.getByRole("option", { name: "简体中文", exact: true }).click();
   await expect(
     page.getByTestId("file-preview").getByRole("alert"),
   ).toContainText("该文件位于外部 .asar.unpacked 目录");
-  await page.getByRole("combobox", { name: "语言" }).selectOption("en");
+  await page.getByRole("combobox", { name: "语言" }).click();
+  await page.getByRole("option", { name: "English", exact: true }).click();
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Drop an ASAR file here" }),

@@ -5,9 +5,10 @@ A local ASAR file browser. Drop an Electron application's `.asar` file to search
 - Rsbuild + TanStack Start, with the homepage prerendered at build time (SSG).
 - `@rsbuild/plugin-tailwindcss` + Tailwind CSS v4.
 - English and Simplified Chinese localization with i18next and react-i18next.
-- shadcn/ui source components (Button and Input), configured in `components.json`.
+- shadcn/ui source components (Button, Input, and Select), configured in `components.json`.
 - TanStack Virtual for the file list, with expandable directories, path search, and a resizable split view.
 - Read-only text previews in Monaco Editor. The editor and its workers are served locally without an external CDN.
+- Rstest for unit tests and Playwright for browser tests.
 - Support for UTF-8 / UTF-16 text, raster images, symbolic links, and empty files, with explanatory messages for binary files and external unpacked files.
 
 ## Development

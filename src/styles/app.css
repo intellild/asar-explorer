@@ -1,6 +1,8 @@
 @import "tailwindcss" source("../");
 @theme inline {
   --color-background: var(--background);
+  --color-popover: var(--background);
+  --color-popover-foreground: var(--foreground);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);

@@ -8,12 +8,13 @@
     "build": "node scripts/create-demo.mjs && rsbuild build && tsc6 --noEmit && node scripts/verify-static.mjs",
     "preview": "node scripts/serve-static.mjs",
     "typecheck": "tsc6 --noEmit",
-    "test": "vitest run",
+    "test": "rstest",
     "test:e2e": "playwright test",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@radix-ui/react-select": "^2.4.0",
     "@radix-ui/react-slot": "^1.5.0",
     "@tanstack/react-router": "^1.170.42",
     "@tanstack/react-start": "^1.168.61",
@@ -34,14 +35,14 @@
     "@rsbuild/core": "^2.0.11",
     "@rsbuild/plugin-react": "^2.0.0",
     "@rsbuild/plugin-tailwindcss": "^2.0.3",
+    "@rstest/core": "^0.12.3",
     "@types/node": "25.0.9",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "prettier": "^3.9.10",
     "smol-toml": "^1.9.1",
     "tailwindcss": "^4.2.2",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vitest": "^5.0.4"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "packageManager": "pnpm@10.34.4"
 }
