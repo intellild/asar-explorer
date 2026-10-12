@@ -12,6 +12,7 @@ import {
   File,
   FileCode2,
   FileImage,
+  Download,
   Folder,
   FolderOpen,
   HardDrive,
@@ -24,9 +25,11 @@ import {
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { FilePreview } from "./FilePreview";
+import { FilePreview, type PreviewStatus } from "./FilePreview";
 import {
   parseAsar,
+  entryBlob,
+  resolveEntry,
   visibleEntries,
   type Archive,
   type ArchiveEntry,
@@ -39,6 +42,9 @@ export function Explorer() {
   const [selected, setSelected] = useState<ArchiveEntry | null>(null);
   const [expanded, setExpanded] = useState(new Set<string>());
   const [query, setQuery] = useState("");
+  const [previewStatus, setPreviewStatus] = useState<PreviewStatus | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -68,6 +74,7 @@ export function Explorer() {
       if (id !== loadId.current) return;
       setArchive(next);
       setSelected(null);
+      setPreviewStatus(null);
       setExpanded(new Set());
       setQuery("");
       if (list.current) list.current.scrollTop = 0;
@@ -99,6 +106,7 @@ export function Explorer() {
   function toggle(entry: ArchiveEntry) {
     if (entry.kind !== "directory") {
       setSelected(entry);
+      setPreviewStatus(null);
       return;
     }
     setExpanded((previous) => {
@@ -124,6 +132,27 @@ export function Explorer() {
       setSidebarWidth(
         Math.max(22, Math.min(55, ((clientX - rect.left) / rect.width) * 100)),
       );
+  }
+  const selectedTarget = useMemo(() => {
+    if (!archive || !selected) return null;
+    try {
+      return resolveEntry(archive, selected);
+    } catch {
+      return null;
+    }
+  }, [archive, selected]);
+  function download() {
+    if (!archive || !selected) return;
+    try {
+      const url = URL.createObjectURL(entryBlob(archive, selected));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = selected.name;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "下载失败。");
+    }
   }
   return (
     <main
@@ -156,38 +185,6 @@ export function Explorer() {
         else if (files[0]) void open(files[0], files[0].name);
       }}
     >
-      <header className="site-header">
-        <a className="brand" href={import.meta.env.PUBLIC_BASE_PATH}>
-          <span className="brand-mark">
-            <Box size={24} strokeWidth={1.7} />
-          </span>
-          <span>
-            ASAR<span className="brand-light"> Explorer</span>
-          </span>
-        </a>
-        <div className="header-right">
-          <span className="local-pill">
-            <span />
-            在你的设备上运行
-          </span>
-          <span className="header-divider" />
-          <span className="header-caption">把归档变成可阅读的文件</span>
-        </div>
-      </header>
-      <section className="page-intro">
-        <div className="eyebrow">
-          <span />
-          INSIDE THE ARCHIVE
-        </div>
-        <h1>
-          打开归档，<span>探索里面。</span>
-        </h1>
-        <p>
-          拖入一个 ASAR 文件，浏览目录、查看代码与资源。
-          <br className="mobile-break" />
-          一切都在浏览器中完成。
-        </p>
-      </section>
       <input
         ref={input}
         type="file"
@@ -201,19 +198,6 @@ export function Explorer() {
           event.target.value = "";
         }}
       />
-      {error && (
-        <div className="error-banner" role="alert">
-          <span>{error}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="关闭错误提示"
-            onClick={() => setError("")}
-          >
-            <X />
-          </Button>
-        </div>
-      )}
       <div
         className="workspace"
         ref={workspace}
@@ -224,24 +208,66 @@ export function Explorer() {
             <span className="tiny-status" />
             <span>工作区</span>
             {archive && (
-              <>
+              <span className="archive-crumb">
                 <span className="slash">/</span>
                 <span className="archive-name" title={archive.name}>
                   {archive.name}
                 </span>
-              </>
+              </span>
             )}
           </div>
-          <Button
-            variant={archive ? "outline" : "ghost"}
-            size="sm"
-            onClick={() => input.current?.click()}
-            disabled={busy}
-          >
-            {busy ? <LoaderCircle className="animate-spin" /> : <Upload />}
-            {busy ? "正在打开…" : archive ? "打开其他文件" : "打开文件"}
-          </Button>
+          {selected && (
+            <div className="selected-file" title={selected.path}>
+              {imageType(selectedTarget?.path ?? selected.path) ? (
+                <FileImage size={16} />
+              ) : (
+                <FileCode2 size={16} />
+              )}
+              <span>{selected.path}</span>
+            </div>
+          )}
+          <div className="workspace-actions">
+            {selected && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={download}
+                disabled={
+                  !selectedTarget ||
+                  selectedTarget.kind === "directory" ||
+                  selectedTarget.unpacked
+                }
+              >
+                <Download />
+                下载
+              </Button>
+            )}
+            <Button
+              variant={archive ? "outline" : "ghost"}
+              size="sm"
+              onClick={() => input.current?.click()}
+              disabled={busy}
+            >
+              {busy ? <LoaderCircle className="animate-spin" /> : <Upload />}
+              <span className="open-label">
+                {busy ? "正在打开…" : archive ? "打开其他文件" : "打开文件"}
+              </span>
+            </Button>
+          </div>
         </div>
+        {error && (
+          <div className="error-banner" role="alert">
+            <span>{error}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="关闭错误提示"
+              onClick={() => setError("")}
+            >
+              <X />
+            </Button>
+          </div>
+        )}
         <div className="workspace-body">
           <aside className="file-sidebar" aria-label="归档文件列表">
             <div className="sidebar-heading">
@@ -397,14 +423,6 @@ export function Explorer() {
                 </div>
               )}
             </div>
-            <div className="sidebar-footer">
-              <HardDrive size={13} />
-              <span>
-                {archive
-                  ? `${archive.fileCount.toLocaleString()} 个文件 · ${formatSize(archive.blob.size)}`
-                  : "等待打开归档"}
-              </span>
-            </div>
           </aside>
           <div
             className="splitter"
@@ -446,13 +464,14 @@ export function Explorer() {
                 key={selected.path}
                 archive={archive}
                 entry={selected}
+                onDownload={download}
+                onStatusChange={setPreviewStatus}
               />
             ) : archive ? (
               <div className="selection-empty">
                 <div className="selection-icon">
                   <Code2 size={32} strokeWidth={1.3} />
                 </div>
-                <h2>每个文件，都有故事。</h2>
                 <p>从左侧选择文件，即可在这里预览。</p>
                 <span className="subtle-tag">
                   <Check size={13} />
@@ -519,28 +538,31 @@ export function Explorer() {
           </section>
         </div>
         <div className="workspace-status">
-          <span>
-            <ShieldCheck size={13} />
-            文件始终留在你的设备
+          <span className="archive-status">
+            <HardDrive size={13} />
+            {archive
+              ? `${archive.fileCount.toLocaleString()} 个文件 · ${formatSize(archive.blob.size)}`
+              : "等待打开归档"}
           </span>
-          <span>
+          {selected && (
+            <span className="file-status">
+              <span>{previewStatus?.language ?? "FILE"}</span>
+              <span>{formatSize(selectedTarget?.size ?? selected.size)}</span>
+              {previewStatus?.lineCount !== undefined && (
+                <span>{previewStatus.lineCount.toLocaleString()} 行</span>
+              )}
+              <span>
+                <ShieldCheck size={12} />
+                只读
+              </span>
+            </span>
+          )}
+          <span className="workspace-ready">
             <span className="tiny-status" />
             {busy ? "正在读取" : archive ? "归档已打开" : "准备就绪"}
           </span>
         </div>
       </div>
-      <footer className="page-footer">
-        <span>
-          <Box size={14} />
-          为探索而生，为隐私而设计。
-        </span>
-        <div>
-          <span>ASAR 格式</span>
-          <span className="footer-dot">·</span>
-          <span>开源工具</span>
-          <span className="version">v1.0</span>
-        </div>
-      </footer>
       {dragging && (
         <div className="drag-overlay">
           <div>

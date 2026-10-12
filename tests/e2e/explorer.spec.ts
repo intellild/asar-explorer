@@ -60,6 +60,14 @@ test("SSG landing, demo, local Monaco, download, image and binary previews", asy
   await expect(
     page.getByRole("heading", { name: "把 ASAR 文件拖到这里" }),
   ).toBeVisible();
+  const viewport = page.viewportSize()!;
+  expect(await page.locator(".workspace").boundingBox()).toEqual({
+    x: 0,
+    y: 0,
+    width: viewport.width,
+    height: viewport.height,
+  });
+  await expect(page.getByText("打开归档，探索里面。")).toHaveCount(0);
   await page.screenshot({ path: "test-results/landing.png", fullPage: true });
   await page.getByRole("button", { name: "试试示例归档" }).click();
   await expect(page.getByText("hello-electron.asar 已就绪")).toBeVisible();
@@ -72,6 +80,13 @@ test("SSG landing, demo, local Monaco, download, image and binary previews", asy
   await expect
     .poll(() => workers.length, { timeout: 15_000 })
     .toBeGreaterThan(0);
+  await expect(page.locator(".workspace-bar")).toContainText("package.json");
+  await expect(
+    page
+      .locator(".workspace-bar")
+      .getByRole("button", { name: "下载", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".workspace-status")).toContainText("172 B");
   await page.screenshot({ path: "test-results/preview.png", fullPage: true });
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "下载", exact: true }).click();
@@ -144,7 +159,9 @@ test("drag and drop, invalid archives and small screens", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
+      () =>
+        document.documentElement.scrollWidth <= innerWidth &&
+        document.documentElement.scrollHeight <= innerHeight,
     ),
   ).toBe(true);
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
