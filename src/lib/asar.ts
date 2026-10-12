@@ -1,3 +1,4 @@
+import { ArchiveError } from "./errors";
 /** ASAR uses two Chromium Pickles followed by uncompressed file contents. */
 export interface ArchiveEntry {
   path: string;
@@ -20,8 +21,8 @@ export interface Archive {
 }
 const MAX_HEADER = 64 * 1024 * 1024;
 const MAX_ENTRIES = 500_000;
-function invalid(reason: string): never {
-  throw new Error(`无法读取 ASAR：${reason}`);
+function invalid(key: string, values: Record<string, string> = {}): never {
+  throw new ArchiveError(`errors.${key}`, values);
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -30,7 +31,7 @@ export async function parseAsar(
   blob: Blob,
   name = "archive.asar",
 ): Promise<Archive> {
-  if (blob.size < 16) invalid("文件头不完整。");
+  if (blob.size < 16) invalid("headerIncomplete");
   const prefix = new DataView(await blob.slice(0, 16).arrayBuffer());
   const headerSize = prefix.getUint32(4, true);
   const jsonSize = prefix.getUint32(12, true);
@@ -40,13 +41,13 @@ export async function parseAsar(
     headerSize % 4 !== 0 ||
     prefix.getUint32(8, true) !== headerSize - 4
   )
-    invalid("不是有效的 ASAR 文件头。");
+    invalid("headerInvalid");
   if (
     headerSize > MAX_HEADER ||
     headerSize + 8 > blob.size ||
     jsonSize > headerSize - 8
   )
-    invalid("文件头大小异常或文件已截断。");
+    invalid("headerSize");
   let header: unknown;
   try {
     header = JSON.parse(
@@ -55,16 +56,16 @@ export async function parseAsar(
       ),
     );
   } catch {
-    invalid("目录索引不是有效的 JSON。");
+    invalid("indexJson");
   }
-  if (!record(header) || !record(header.files)) invalid("缺少文件目录。");
+  if (!record(header) || !record(header.files)) invalid("missingFiles");
   const entries: ArchiveEntry[] = [];
   const byPath = new Map<string, ArchiveEntry>();
   const dataOffset = headerSize + 8;
   const pending = [{ files: header.files, parent: "", depth: 0 }];
   while (pending.length) {
     const { files, parent, depth } = pending.pop()!;
-    if (depth > 512) invalid("目录层级过深。");
+    if (depth > 512) invalid("depth");
     for (const [entryName, node] of Object.entries(files)) {
       if (
         !entryName ||
@@ -73,13 +74,13 @@ export async function parseAsar(
         /[/\\\0]/.test(entryName) ||
         !record(node)
       )
-        invalid("目录条目无效。");
+        invalid("entryInvalid");
       const path = parent ? `${parent}/${entryName}` : entryName;
       const base = { path, name: entryName, parent, depth, size: 0 };
       let entry: ArchiveEntry;
       if ("files" in node) {
         if (!record(node.files) || "link" in node || "offset" in node)
-          invalid(`目录 ${path} 无效。`);
+          invalid("directoryInvalid", { path });
         entry = { ...base, kind: "directory" };
         pending.push({ files: node.files, parent: path, depth: depth + 1 });
       } else if ("link" in node) {
@@ -89,25 +90,25 @@ export async function parseAsar(
           node.link.split("/").some((part) => part === "..") ||
           /[\\\0]/.test(node.link)
         )
-          invalid(`链接 ${path} 无效。`);
+          invalid("linkInvalid", { path });
         entry = { ...base, kind: "link", link: node.link };
       } else {
         if (!Number.isSafeInteger(node.size) || (node.size as number) < 0)
-          invalid(`文件 ${path} 大小无效。`);
+          invalid("fileSize", { path });
         if ("unpacked" in node && typeof node.unpacked !== "boolean")
-          invalid(`文件 ${path} 的 unpacked 标记无效。`);
+          invalid("unpackedFlag", { path });
         const size = node.size as number;
         let offset: number | undefined;
         if (!node.unpacked) {
           if (typeof node.offset !== "string" || !/^\d+$/.test(node.offset))
-            invalid(`文件 ${path} 偏移无效。`);
+            invalid("offset", { path });
           offset = Number(node.offset);
           if (
             !Number.isSafeInteger(offset) ||
             !Number.isSafeInteger(offset + size) ||
             offset + size > blob.size - dataOffset
           )
-            invalid(`文件 ${path} 的内容超出归档范围。`);
+            invalid("outOfRange", { path });
         }
         entry = {
           ...base,
@@ -119,7 +120,7 @@ export async function parseAsar(
       }
       entries.push(entry);
       byPath.set(path, entry);
-      if (entries.length > MAX_ENTRIES) invalid("文件条目过多。");
+      if (entries.length > MAX_ENTRIES) invalid("entryCount");
     }
   }
   entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
@@ -138,10 +139,11 @@ export function resolveEntry(
 ): ArchiveEntry {
   const seen = new Set<string>();
   while (entry.kind === "link") {
-    if (seen.has(entry.path)) throw new Error("此符号链接包含循环引用。");
+    if (seen.has(entry.path)) throw new ArchiveError("errors.linkCycle");
     seen.add(entry.path);
     const next = archive.byPath.get(entry.link!);
-    if (!next) throw new Error(`链接目标不存在：${entry.link}`);
+    if (!next)
+      throw new ArchiveError("errors.linkMissing", { path: entry.link! });
     entry = next;
   }
   return entry;
@@ -149,9 +151,8 @@ export function resolveEntry(
 export function entryBlob(archive: Archive, original: ArchiveEntry): Blob {
   const entry = resolveEntry(archive, original);
   if (entry.kind === "directory")
-    throw new Error("此链接指向目录，请在文件列表中打开该目录。");
-  if (entry.unpacked)
-    throw new Error("该文件位于外部 .asar.unpacked 目录，不包含在此归档中。");
+    throw new ArchiveError("errors.linkDirectory");
+  if (entry.unpacked) throw new ArchiveError("errors.unpackedFile");
   return archive.blob.slice(
     archive.dataOffset + entry.offset!,
     archive.dataOffset + entry.offset! + entry.size,

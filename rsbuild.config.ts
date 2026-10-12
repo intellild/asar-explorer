@@ -1,4 +1,5 @@
 import { tanstackStart } from "@tanstack/react-start/plugin/rsbuild";
+import { parse as parseToml } from "smol-toml";
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 import { pluginTailwindcss } from "@rsbuild/plugin-tailwindcss";
@@ -8,6 +9,15 @@ export default defineConfig({
   server: { port: 3000, base },
   source: {
     define: { "import.meta.env.PUBLIC_BASE_PATH": JSON.stringify(base) },
+  },
+  tools: {
+    rspack: {
+      module: {
+        rules: [
+          { test: /\.toml$/, type: "json", parser: { parse: parseToml } },
+        ],
+      },
+    },
   },
   plugins: [
     pluginTailwindcss(),

@@ -3,17 +3,18 @@ import type { ReactNode } from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import "~/styles/app.css";
+import { LocaleProvider } from "~/i18n/Provider";
+import { DEFAULT_LANGUAGE, staticT } from "~/i18n";
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ASAR Explorer — 本地 ASAR 文件浏览器" },
+      { title: staticT("app.title") },
       {
         name: "description",
-        content:
-          "在浏览器中打开 ASAR 归档，搜索文件、预览代码与图片。文件始终留在你的设备。",
+        content: staticT("app.description"),
       },
       { name: "theme-color", content: "#f7f8fa" },
     ],
@@ -31,12 +32,12 @@ export const Route = createRootRoute({
 });
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang={DEFAULT_LANGUAGE}>
       <head>
         <HeadContent />
       </head>
       <body>
-        {children}
+        <LocaleProvider>{children}</LocaleProvider>
         <Scripts />
       </body>
     </html>

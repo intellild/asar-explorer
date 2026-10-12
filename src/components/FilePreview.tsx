@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { ArchiveError, asArchiveError, errorMessage } from "~/lib/errors";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Download, FileQuestion, LoaderCircle } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -21,8 +23,9 @@ type Preview =
   | { kind: "loading" }
   | { kind: "text"; text: string }
   | { kind: "image"; url: string }
-  | { kind: "message"; title: string; detail: string }
-  | { kind: "error"; message: string };
+  | { kind: "large"; limit: number }
+  | { kind: "binary" }
+  | { kind: "error"; error: ArchiveError };
 export interface PreviewStatus {
   language: string;
   lineCount?: number;
@@ -38,6 +41,7 @@ export function FilePreview({
   onDownload: () => void;
   onStatusChange: (status: PreviewStatus) => void;
 }) {
+  const { t } = useTranslation();
   const [preview, setPreview] = useState<Preview>({ kind: "loading" });
   let target: ArchiveEntry | undefined;
   try {
@@ -58,9 +62,8 @@ export function FilePreview({
         if (blob.size > limit) {
           if (!cancelled)
             setPreview({
-              kind: "message",
-              title: "文件较大，暂不预览",
-              detail: `${mime ? "图片" : "文本"}预览上限为 ${formatSize(limit)}。你仍然可以下载完整文件。`,
+              kind: "large",
+              limit,
             });
         } else if (mime) {
           imageUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
@@ -71,10 +74,7 @@ export function FilePreview({
             setPreview(
               text === null
                 ? {
-                    kind: "message",
-                    title: "这是一个二进制文件",
-                    detail:
-                      "此格式不支持直接预览，可以下载后使用相应应用打开。",
+                    kind: "binary",
                   }
                 : { kind: "text", text },
             );
@@ -83,7 +83,7 @@ export function FilePreview({
         if (!cancelled)
           setPreview({
             kind: "error",
-            message: error instanceof Error ? error.message : "读取文件失败。",
+            error: asArchiveError(error, "errors.readFailed"),
           });
       }
     }
@@ -109,13 +109,15 @@ export function FilePreview({
         {preview.kind === "loading" && (
           <div className="preview-message">
             <LoaderCircle className="animate-spin" />
-            正在读取文件…
+            {t("preview.reading")}
           </div>
         )}
         {preview.kind === "text" && (
           <Suspense
             fallback={
-              <div className="preview-message">正在加载代码编辑器…</div>
+              <div className="preview-message">
+                {t("preview.loadingEditor")}
+              </div>
             }
           >
             <MonacoPreview
@@ -133,28 +135,40 @@ export function FilePreview({
               onError={() =>
                 setPreview({
                   kind: "error",
-                  message: "图片内容无效或浏览器不支持此图片格式。",
+                  error: new ArchiveError("errors.imageInvalid"),
                 })
               }
             />
           </div>
         )}
-        {preview.kind === "message" && (
+        {(preview.kind === "large" || preview.kind === "binary") && (
           <div className="preview-message">
             <FileQuestion size={36} />
-            <h3>{preview.title}</h3>
-            <p>{preview.detail}</p>
+            <h3>
+              {t(
+                preview.kind === "large"
+                  ? "preview.tooLarge"
+                  : "preview.binary",
+              )}
+            </h3>
+            <p>
+              {preview.kind === "large"
+                ? t(mime ? "preview.imageLimit" : "preview.textLimit", {
+                    limit: formatSize(preview.limit),
+                  })
+                : t("preview.binaryHint")}
+            </p>
             <Button variant="outline" onClick={onDownload}>
               <Download />
-              下载文件
+              {t("common.downloadFile")}
             </Button>
           </div>
         )}
         {preview.kind === "error" && (
           <div className="preview-message" role="alert">
             <FileQuestion size={36} />
-            <h3>无法预览此文件</h3>
-            <p>{preview.message}</p>
+            <h3>{t("preview.failed")}</h3>
+            <p>{errorMessage(preview.error, t)}</p>
           </div>
         )}
       </div>

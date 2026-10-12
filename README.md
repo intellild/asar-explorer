@@ -1,44 +1,53 @@
 # ASAR Explorer
 
-一个纯本地的 ASAR 文件浏览器。拖入 Electron 应用的 `.asar` 文件，即可搜索目录、预览代码与图片、下载单个文件。归档不会上传到服务器。
+A local ASAR file browser. Drop an Electron application's `.asar` file to search its directory tree, preview code and images, and download individual files. Archives stay on your device and are never uploaded to a server.
 
-- Rsbuild + TanStack Start，首页在构建时预渲染（SSG）。
-- `@rsbuild/plugin-tailwindcss` + Tailwind CSS v4。
-- shadcn/ui 的源码组件（Button、Input），配置见 `components.json`。
-- TanStack Virtual 渲染文件列表；支持目录展开、折叠、路径搜索与可调整双栏。
-- Monaco Editor 只读文本预览，编辑器和 worker 都由本站提供，无需外部 CDN。
-- 支持 UTF-8 / UTF-16 文本、栅格图片、符号链接、空文件；二进制与外部 unpacked 文件有对应提示。
+- Rsbuild + TanStack Start, with the homepage prerendered at build time (SSG).
+- `@rsbuild/plugin-tailwindcss` + Tailwind CSS v4.
+- English and Simplified Chinese localization with i18next and react-i18next.
+- shadcn/ui source components (Button and Input), configured in `components.json`.
+- TanStack Virtual for the file list, with expandable directories, path search, and a resizable split view.
+- Read-only text previews in Monaco Editor. The editor and its workers are served locally without an external CDN.
+- Support for UTF-8 / UTF-16 text, raster images, symbolic links, and empty files, with explanatory messages for binary files and external unpacked files.
 
-## 开发
+## Development
 
-需要 Node.js 22.12+ 与 pnpm 10。
+Requires Node.js 22.12+ and pnpm 10.
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-打开 http://localhost:3000。开发模式的示例归档可先通过 `node scripts/create-demo.mjs` 生成。
+Open http://localhost:3000. To use the example archive in development, generate it first with `node scripts/create-demo.mjs`.
 
 ```sh
-pnpm test       # 真实 Electron ASAR 兼容性与异常输入测试
-pnpm build      # 生成示例、SSG、类型检查、校验静态 HTML 与资源引用
-pnpm preview    # 仅提供 dist/client 的静态文件，无需 SSR 服务
+pnpm test       # Real Electron ASAR compatibility and malformed input tests
+pnpm build      # Generate the demo, prerender, typecheck, and verify static HTML and assets
+pnpm preview    # Serve dist/client as static files without an SSR server
 pnpm exec playwright install chromium
-pnpm test:e2e  # 拖放、Monaco、图片、下载、3000 条虚拟列表和手机布局
+pnpm test:e2e   # Drag and drop, Monaco, images, downloads, 3,000 virtualized files, and mobile layout
 ```
 
-Monaco 按需加载；文本预览上限为 2 MiB，图片预览上限为 20 MiB，较大的文件仍可下载完整内容。解析只读取归档头；选择文件时才读取相应内容。`.asar.unpacked` 中的文件不在归档内，因此不能从单独的 ASAR 中提取。
+Monaco loads on demand. Text previews are limited to 2 MiB and image previews to 20 MiB; larger files can still be downloaded in full. Parsing reads only the archive header, and file contents are read when selected. Files marked as unpacked are stored in the accompanying `.asar.unpacked` directory, so their contents cannot be extracted from the ASAR file alone.
+
+## Localization
+
+Translation files live in `src/i18n/locales/en.toml` and `src/i18n/locales/zh-CN.toml`. Rsbuild parses TOML into bundled resources at build time with `smol-toml`; the browser does not need a TOML parser or a translation server.
+
+Use the language selector in the workspace toolbar to switch languages. The app detects supported browser languages and remembers your choice in local storage. The SSG page and initial client render use Simplified Chinese; browser preferences are restored after hydration. File names and file contents remain unchanged when switching languages.
+
+Add strings to both TOML files using matching keys. Interpolation uses i18next syntax, such as `{{name}}`, and plurals use `_one` / `_other` keys. Parser errors carry translation keys so existing error messages also update when the language changes.
 
 ## GitHub Pages
 
-`.github/workflows/deploy.yml` 仅支持手动触发，执行测试、SSG 构建、浏览器测试并发布 `dist/client`。推送代码不会自动部署。仅构建阶段使用 SSR，线上是静态站点。
+`.github/workflows/deploy.yml` runs only when manually triggered. It runs tests, builds the static site, runs browser tests, and publishes `dist/client`. Pushing code does not trigger a deployment. SSR is used only during the build; the deployed site is entirely static.
 
-1. 将项目推送到目标 GitHub 仓库的 `main` 分支。
-2. 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
-3. 打开 **Actions → Deploy GitHub Pages → Run workflow**，选择 `main` 分支并手动运行。
+1. Push the project to the target GitHub repository's `main` branch.
+2. In **Settings → Pages → Build and deployment → Source**, select **GitHub Actions**.
+3. Open **Actions → Deploy GitHub Pages → Run workflow**, select `main`, and run the workflow manually.
 
-工作流根据仓库名称计算 github.io 子路径，构建与测试不依赖 Pages 是否已启用。部署阶段通过 `actions/configure-pages` 检查 Pages 设置。例如 `owner/asar-explorer` 会使用 `/asar-explorer/`，而 `owner/owner.github.io` 会使用 `/`。本地可用同样的配置验证项目站点：
+The workflow derives the github.io base path from the repository name. Building and testing do not require Pages to be enabled; the deployment job checks the Pages configuration with `actions/configure-pages`. For example, `owner/asar-explorer` uses `/asar-explorer/`, while `owner/owner.github.io` uses `/`. To verify a project site's base path locally:
 
 ```sh
 PUBLIC_BASE_PATH=/asar-explorer/ pnpm build
@@ -46,31 +55,31 @@ PUBLIC_BASE_PATH=/asar-explorer/ pnpm preview
 # http://127.0.0.1:3000/asar-explorer/
 ```
 
-构建后会检查预渲染页面包含完整首页内容、每个本地资源存在且使用正确前缀，并生成 `.nojekyll`。
+After building, the static verifier checks that the prerendered HTML contains the complete homepage and that local assets exist and use the correct prefix. It also creates `.nojekyll`.
 
-线上地址：https://intellild.github.io/asar-explorer/ 。发布后可直接对线上站点运行同一组浏览器测试：
+Live site: [ASAR Explorer](https://intellild.github.io/asar-explorer/). After deployment, run the same browser tests against the live site:
 
 ```sh
 E2E_BASE_URL=https://intellild.github.io/asar-explorer/ pnpm test:e2e
 ```
 
-线上验证同样只在浏览器中读取测试文件，不上传归档。
+Live tests also read test files locally in the browser without uploading archives.
 
-## 文件结构
+## File structure
 
 ```text
-拖入 / 选择文件
+Drop or select a file
   src/components/Explorer.tsx
        ↓
-读取 Pickle 文件头、验证目录与内容范围
+Read the Pickle header; validate the directory index and content ranges
   src/lib/asar.ts
        ↓
-目录展开 / 路径搜索 → TanStack Virtual 文件列表
+Expand directories / search paths → TanStack Virtual file list
   src/components/Explorer.tsx
        ↓
-按 offset + size 读取选中文件
+Read the selected file using offset + size
   src/lib/asar.ts → src/lib/preview.ts
        ↓
-Monaco 文本预览 / 图片预览 / 状态提示
+Monaco text preview / image preview / status messages
   src/components/FilePreview.tsx → MonacoPreview.tsx
 ```

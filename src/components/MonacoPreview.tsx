@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import Editor, { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api.js";
 import "monaco-editor/basic-languages/monaco.contribution.js";
@@ -27,6 +28,7 @@ export default function MonacoPreview({
   language: string;
   path: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Editor
       height="100%"
@@ -34,7 +36,9 @@ export default function MonacoPreview({
       value={text}
       language={language}
       theme="asar-light"
-      loading={<div className="preview-message">正在加载代码编辑器…</div>}
+      loading={
+        <div className="preview-message">{t("preview.loadingEditor")}</div>
+      }
       beforeMount={(editor) =>
         editor.editor.defineTheme("asar-light", {
           base: "vs",

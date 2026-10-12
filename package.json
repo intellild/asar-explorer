@@ -20,10 +20,12 @@
     "@tanstack/react-virtual": "^3.14.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "i18next": "^26.4.4",
     "lucide-react": "^1.55.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-i18next": "^17.0.16",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
@@ -36,6 +38,7 @@
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "prettier": "^3.9.10",
+    "smol-toml": "^1.9.1",
     "tailwindcss": "^4.2.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^5.0.4"

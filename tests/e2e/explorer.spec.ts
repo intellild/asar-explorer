@@ -186,3 +186,91 @@ test("large, external and empty files have usable preview states", async ({
   await page.getByTestId("file-row").filter({ hasText: "empty.txt" }).click();
   await expect(page.locator(".monaco-editor")).toBeVisible();
 });
+
+test("language switching preserves previews, translates existing errors, and persists", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("./");
+  await page.getByRole("button", { name: "试试示例归档" }).click();
+  await page
+    .getByTestId("file-row")
+    .filter({ hasText: "package.json" })
+    .click();
+  await expect(page.locator(".view-lines")).toContainText("hello-electron");
+  await page.getByRole("combobox", { name: "语言" }).selectOption("en");
+  await expect(
+    page.getByRole("button", { name: "Download", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".view-lines")).toContainText("hello-electron");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page).toHaveTitle("ASAR Explorer — Local ASAR file browser");
+  await expect(page.locator(".workspace-status")).toContainText("11 files");
+  await page
+    .getByLabel("Choose an ASAR file", { exact: true })
+    .setInputFiles(specialFiles);
+  await page
+    .getByTestId("file-row")
+    .filter({ hasText: "external.node" })
+    .click();
+  await expect(
+    page.getByTestId("file-preview").getByRole("alert"),
+  ).toContainText(
+    "This file is stored in the external .asar.unpacked directory",
+  );
+  await expect(
+    page.getByTestId("file-row").filter({ hasText: "external.node" }),
+  ).toContainText("External");
+  await page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN");
+  await expect(
+    page.getByTestId("file-preview").getByRole("alert"),
+  ).toContainText("该文件位于外部 .asar.unpacked 目录");
+  await page.getByRole("combobox", { name: "语言" }).selectOption("en");
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Drop an ASAR file here" }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  expect(errors).toEqual([]);
+});
+
+test.describe("browser language detection", () => {
+  test.use({ locale: "en-US" });
+  test("uses English browser preferences after SSG hydration on mobile", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("./");
+    await expect(
+      page.getByRole("heading", { name: "Drop an ASAR file here" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Try the example archive" }).click();
+    await page
+      .getByTestId("file-row")
+      .filter({ hasText: "package.json" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Download", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator(".view-lines")).toContainText("hello-electron");
+    expect(await page.locator(".workspace").boundingBox()).toEqual({
+      x: 0,
+      y: 0,
+      width: 390,
+      height: 844,
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: "test-results/mobile-en.png",
+      fullPage: true,
+    });
+    expect(errors).toEqual([]);
+  });
+});

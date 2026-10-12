@@ -1,4 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocalePreference } from "~/i18n/useLocalePreference";
+import { LanguageSelect } from "./LanguageSelect";
+import { ArchiveError, asArchiveError, errorMessage } from "~/lib/errors";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowRight,
@@ -38,6 +42,8 @@ import { imageType } from "~/lib/preview";
 import { formatSize } from "~/lib/utils";
 
 export function Explorer() {
+  const { t } = useTranslation();
+  useLocalePreference();
   const [archive, setArchive] = useState<Archive | null>(null);
   const [selected, setSelected] = useState<ArchiveEntry | null>(null);
   const [expanded, setExpanded] = useState(new Set<string>());
@@ -46,7 +52,7 @@ export function Explorer() {
     null,
   );
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ArchiveError | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(31);
   const input = useRef<HTMLInputElement>(null);
@@ -68,7 +74,7 @@ export function Explorer() {
   const open = useCallback(async (blob: Blob, name: string) => {
     const id = ++loadId.current;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const next = await parseAsar(blob, name);
       if (id !== loadId.current) return;
@@ -80,7 +86,7 @@ export function Explorer() {
       if (list.current) list.current.scrollTop = 0;
     } catch (error) {
       if (id === loadId.current)
-        setError(error instanceof Error ? error.message : "打开文件失败。");
+        setError(asArchiveError(error, "errors.openFailed"));
     } finally {
       if (id === loadId.current) setBusy(false);
     }
@@ -88,17 +94,17 @@ export function Explorer() {
   async function demo() {
     const id = ++loadId.current;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const response = await fetch(
         `${import.meta.env.PUBLIC_BASE_PATH}demo.asar`,
       );
-      if (!response.ok) throw new Error("示例文件加载失败，请重试。");
+      if (!response.ok) throw new ArchiveError("errors.demoFailed");
       const blob = await response.blob();
       if (id === loadId.current) await open(blob, "hello-electron.asar");
     } catch (error) {
       if (id === loadId.current) {
-        setError(error instanceof Error ? error.message : "示例加载失败。");
+        setError(asArchiveError(error, "errors.demoFailed"));
         setBusy(false);
       }
     }
@@ -151,7 +157,7 @@ export function Explorer() {
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "下载失败。");
+      setError(asArchiveError(error, "errors.downloadFailed"));
     }
   }
   return (
@@ -181,7 +187,7 @@ export function Explorer() {
         dragDepth.current = 0;
         setDragging(false);
         const files = event.dataTransfer.files;
-        if (files.length > 1) setError("请一次打开一个 ASAR 文件。");
+        if (files.length > 1) setError(new ArchiveError("errors.oneFile"));
         else if (files[0]) void open(files[0], files[0].name);
       }}
     >
@@ -190,7 +196,7 @@ export function Explorer() {
         type="file"
         tabIndex={-1}
         accept=".asar"
-        aria-label="选择 ASAR 文件"
+        aria-label={t("workspace.selectFile")}
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -206,7 +212,7 @@ export function Explorer() {
         <div className="workspace-bar">
           <div className="workspace-label">
             <span className="tiny-status" />
-            <span>工作区</span>
+            <span>{t("workspace.title")}</span>
             {archive && (
               <span className="archive-crumb">
                 <span className="slash">/</span>
@@ -227,10 +233,12 @@ export function Explorer() {
             </div>
           )}
           <div className="workspace-actions">
+            <LanguageSelect />
             {selected && (
               <Button
                 variant="ghost"
                 size="sm"
+                aria-label={t("common.download")}
                 onClick={download}
                 disabled={
                   !selectedTarget ||
@@ -239,39 +247,52 @@ export function Explorer() {
                 }
               >
                 <Download />
-                下载
+                <span className="action-label">{t("common.download")}</span>
               </Button>
             )}
             <Button
               variant={archive ? "outline" : "ghost"}
               size="sm"
               onClick={() => input.current?.click()}
+              aria-label={t(
+                busy
+                  ? "workspace.opening"
+                  : archive
+                    ? "workspace.openAnother"
+                    : "workspace.open",
+              )}
               disabled={busy}
             >
               {busy ? <LoaderCircle className="animate-spin" /> : <Upload />}
               <span className="open-label">
-                {busy ? "正在打开…" : archive ? "打开其他文件" : "打开文件"}
+                {t(
+                  busy
+                    ? "workspace.opening"
+                    : archive
+                      ? "workspace.openAnother"
+                      : "workspace.open",
+                )}
               </span>
             </Button>
           </div>
         </div>
         {error && (
           <div className="error-banner" role="alert">
-            <span>{error}</span>
+            <span>{errorMessage(error, t)}</span>
             <Button
               variant="ghost"
               size="icon"
-              aria-label="关闭错误提示"
-              onClick={() => setError("")}
+              aria-label={t("common.closeError")}
+              onClick={() => setError(null)}
             >
               <X />
             </Button>
           </div>
         )}
         <div className="workspace-body">
-          <aside className="file-sidebar" aria-label="归档文件列表">
+          <aside className="file-sidebar" aria-label={t("files.list")}>
             <div className="sidebar-heading">
-              <span>文件目录</span>
+              <span>{t("files.title")}</span>
               <span className="count-badge">
                 {archive ? archive.fileCount.toLocaleString() : "—"}
               </span>
@@ -279,8 +300,8 @@ export function Explorer() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="展开所有目录"
-                  title="展开所有目录"
+                  aria-label={t("files.expandAll")}
+                  title={t("files.expandAll")}
                   onClick={expandAll}
                   disabled={!archive}
                 >
@@ -289,8 +310,8 @@ export function Explorer() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="折叠所有目录"
-                  title="折叠所有目录"
+                  aria-label={t("files.collapseAll")}
+                  title={t("files.collapseAll")}
                   onClick={() => setExpanded(new Set())}
                   disabled={!archive}
                 >
@@ -301,8 +322,8 @@ export function Explorer() {
             <div className="search-wrap">
               <Search size={15} />
               <Input
-                aria-label="搜索文件"
-                placeholder="搜索文件或路径…"
+                aria-label={t("files.search")}
+                placeholder={t("files.searchPlaceholder")}
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
@@ -313,7 +334,7 @@ export function Explorer() {
               {query && (
                 <button
                   className="clear-search"
-                  aria-label="清空搜索"
+                  aria-label={t("files.clearSearch")}
                   onClick={() => setQuery("")}
                 >
                   <X size={13} />
@@ -341,11 +362,11 @@ export function Explorer() {
                       package.json
                     </span>
                   </div>
-                  <p>打开归档后，文件会显示在这里</p>
+                  <p>{t("files.waiting")}</p>
                 </div>
               ) : rows.length === 0 ? (
                 <div className="list-empty">
-                  {query ? "没有匹配的文件" : "此归档没有文件"}
+                  {t(query ? "files.noMatches" : "files.empty")}
                 </div>
               ) : (
                 <div
@@ -407,12 +428,14 @@ export function Explorer() {
                           {query ? entry.path : entry.name}
                         </span>
                         {entry.unpacked ? (
-                          <span className="unpacked-label">外部</span>
+                          <span className="unpacked-label">
+                            {t("files.external")}
+                          </span>
                         ) : (
                           entry.kind !== "directory" && (
                             <span className="row-size">
                               {entry.kind === "link"
-                                ? "链接"
+                                ? t("files.link")
                                 : formatSize(entry.size)}
                             </span>
                           )
@@ -427,7 +450,7 @@ export function Explorer() {
           <div
             className="splitter"
             role="separator"
-            aria-label="调整文件列表宽度"
+            aria-label={t("workspace.resize")}
             aria-orientation="vertical"
             aria-valuemin={22}
             aria-valuemax={55}
@@ -458,7 +481,7 @@ export function Explorer() {
               }
             }}
           />
-          <section className="preview-area" aria-label="文件预览">
+          <section className="preview-area" aria-label={t("workspace.preview")}>
             {archive && selected ? (
               <FilePreview
                 key={selected.path}
@@ -472,10 +495,10 @@ export function Explorer() {
                 <div className="selection-icon">
                   <Code2 size={32} strokeWidth={1.3} />
                 </div>
-                <p>从左侧选择文件，即可在这里预览。</p>
+                <p>{t("workspace.chooseToPreview")}</p>
                 <span className="subtle-tag">
                   <Check size={13} />
-                  {archive.name} 已就绪
+                  {t("workspace.fileReady", { name: archive.name })}
                 </span>
               </div>
             ) : (
@@ -487,7 +510,7 @@ export function Explorer() {
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-label="拖入或选择 ASAR 文件"
+                  aria-label={t("drop.label")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
@@ -511,25 +534,23 @@ export function Explorer() {
                     <span className="art-spark">+</span>
                   </div>
                   <span className="filetype-chip">.ASAR</span>
-                  <h2>{busy ? "正在打开归档…" : "把 ASAR 文件拖到这里"}</h2>
-                  <p>或者点击选择本地文件</p>
+                  <h2>{t(busy ? "drop.opening" : "drop.title")}</h2>
+                  <p>{t("drop.hint")}</p>
                   <span className="choose-button">
                     {busy ? (
                       <LoaderCircle size={16} className="animate-spin" />
                     ) : (
                       <Upload size={16} />
                     )}
-                    选择文件
+                    {t("drop.choose")}
                     <ArrowRight size={15} />
                   </span>
-                  <span className="dropzone-note">
-                    Electron 应用归档 · 无需安装
-                  </span>
+                  <span className="dropzone-note">{t("drop.note")}</span>
                 </div>
                 <div className="demo-line">
-                  <span>还没有文件？</span>
+                  <span>{t("drop.noFile")}</span>
                   <button onClick={() => void demo()} disabled={busy}>
-                    试试示例归档
+                    {t("drop.demo")}
                     <ArrowRight size={13} />
                   </button>
                 </div>
@@ -541,25 +562,39 @@ export function Explorer() {
           <span className="archive-status">
             <HardDrive size={13} />
             {archive
-              ? `${archive.fileCount.toLocaleString()} 个文件 · ${formatSize(archive.blob.size)}`
-              : "等待打开归档"}
+              ? `${t("files.count", { count: archive.fileCount })} · ${formatSize(archive.blob.size)}`
+              : t("workspace.waiting")}
           </span>
           {selected && (
             <span className="file-status">
-              <span>{previewStatus?.language ?? "FILE"}</span>
+              <span>
+                {!previewStatus || previewStatus.language === "FILE"
+                  ? t("files.fileType")
+                  : previewStatus.language === "IMAGE"
+                    ? t("files.imageType")
+                    : previewStatus.language}
+              </span>
               <span>{formatSize(selectedTarget?.size ?? selected.size)}</span>
               {previewStatus?.lineCount !== undefined && (
-                <span>{previewStatus.lineCount.toLocaleString()} 行</span>
+                <span>
+                  {t("files.lines", { count: previewStatus.lineCount })}
+                </span>
               )}
               <span>
                 <ShieldCheck size={12} />
-                只读
+                {t("common.readOnly")}
               </span>
             </span>
           )}
           <span className="workspace-ready">
             <span className="tiny-status" />
-            {busy ? "正在读取" : archive ? "归档已打开" : "准备就绪"}
+            {t(
+              busy
+                ? "workspace.reading"
+                : archive
+                  ? "workspace.opened"
+                  : "workspace.ready",
+            )}
           </span>
         </div>
       </div>
@@ -567,8 +602,8 @@ export function Explorer() {
         <div className="drag-overlay">
           <div>
             <Upload size={38} />
-            <h2>松开鼠标，打开归档</h2>
-            <p>文件只会在本地读取</p>
+            <h2>{t("drop.release")}</h2>
+            <p>{t("drop.localOnly")}</p>
           </div>
         </div>
       )}

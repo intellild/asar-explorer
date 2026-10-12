@@ -780,3 +780,26 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+.language-select {
+  height: 32px;
+  max-width: 105px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: #5d6d63;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 6px;
+  cursor: pointer;
+  outline-color: var(--primary);
+}
+@media (max-width: 700px) {
+  .workspace-actions .action-label,
+  .workspace-actions .open-label {
+    display: none;
+  }
+  .language-select {
+    max-width: 85px;
+  }
+}

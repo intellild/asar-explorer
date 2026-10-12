@@ -79,7 +79,7 @@ describe("Electron-compatible ASAR reading", () => {
     expect(archive.byPath.get("external.node")?.unpacked).toBe(true);
     expect(() =>
       entryBlob(archive, archive.byPath.get("external.node")!),
-    ).toThrow(".asar.unpacked");
+    ).toThrow("unpackedFile");
   });
   it("filters nested files and exposes them only when parents are expanded", () => {
     expect(
@@ -107,28 +107,28 @@ describe("Electron-compatible ASAR reading", () => {
 describe("malformed archives", () => {
   it("rejects truncated and non-ASAR inputs", async () => {
     await expect(parseAsar(new Blob(["not an archive"]))).rejects.toThrow(
-      "文件头",
+      "header",
     );
     await expect(parseAsar(new Blob([new Uint8Array(16)]))).rejects.toThrow(
-      "文件头",
+      "header",
     );
     const blob = archiveWith({ file: { size: 8, offset: "0" } });
-    await expect(parseAsar(blob)).rejects.toThrow("超出归档范围");
+    await expect(parseAsar(blob)).rejects.toThrow("outOfRange");
   });
   it("rejects oversized headers, unsafe offsets, and malformed names", async () => {
     const data = new Uint8Array(await archiveWith({}).arrayBuffer());
     new DataView(data.buffer).setUint32(4, 128 * 1024 * 1024, true);
     new DataView(data.buffer).setUint32(8, 128 * 1024 * 1024 - 4, true);
-    await expect(parseAsar(new Blob([data]))).rejects.toThrow("大小异常");
+    await expect(parseAsar(new Blob([data]))).rejects.toThrow("headerSize");
     await expect(
       parseAsar(archiveWith({ bad: { size: 1, offset: "9007199254740992" } })),
-    ).rejects.toThrow("超出归档范围");
+    ).rejects.toThrow("outOfRange");
     await expect(
       parseAsar(archiveWith({ "../bad": { size: 0, offset: "0" } })),
-    ).rejects.toThrow("目录条目");
+    ).rejects.toThrow("entryInvalid");
     await expect(
       parseAsar(archiveWith({ bad: { size: -1, offset: "0" } })),
-    ).rejects.toThrow("大小无效");
+    ).rejects.toThrow("fileSize");
   });
   it("reports circular and broken symlinks", async () => {
     const cyclic = await parseAsar(
@@ -138,16 +138,18 @@ describe("malformed archives", () => {
         broken: { link: "missing" },
       }),
     );
-    expect(() => entryBlob(cyclic, cyclic.byPath.get("a")!)).toThrow("循环");
+    expect(() => entryBlob(cyclic, cyclic.byPath.get("a")!)).toThrow(
+      "linkCycle",
+    );
     expect(() => entryBlob(cyclic, cyclic.byPath.get("broken")!)).toThrow(
-      "不存在",
+      "linkMissing",
     );
   });
   it("rejects invalid JSON and invalid directory indexes", async () => {
     const bytes = new Uint8Array(await archiveWith({}).arrayBuffer());
     bytes[16] = 0xff;
-    await expect(parseAsar(new Blob([bytes]))).rejects.toThrow("JSON");
-    await expect(parseAsar(archiveWith(null))).rejects.toThrow("文件目录");
+    await expect(parseAsar(new Blob([bytes]))).rejects.toThrow("indexJson");
+    await expect(parseAsar(archiveWith(null))).rejects.toThrow("missingFiles");
   });
 });
 describe("text preview", () => {
