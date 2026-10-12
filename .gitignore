@@ -17,3 +17,6 @@ dist
 /blob-report/
 /playwright/.cache/
 .tanstack
+
+.pnpm-store/
+public/demo.asar
