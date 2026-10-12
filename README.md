@@ -48,6 +48,14 @@ PUBLIC_BASE_PATH=/asar-explorer/ pnpm preview
 
 构建后会检查预渲染页面包含完整首页内容、每个本地资源存在且使用正确前缀，并生成 `.nojekyll`。
 
+线上地址：https://intellild.github.io/asar-explorer/ 。发布后可直接对线上站点运行同一组浏览器测试：
+
+```sh
+E2E_BASE_URL=https://intellild.github.io/asar-explorer/ pnpm test:e2e
+```
+
+线上验证同样只在浏览器中读取测试文件，不上传归档。
+
 ## 文件结构
 
 ```text

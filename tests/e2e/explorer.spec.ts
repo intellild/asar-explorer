@@ -33,6 +33,7 @@ test.afterAll(async () => {
 });
 test("SSG landing, demo, local Monaco, download, image and binary previews", async ({
   page,
+  baseURL,
 }) => {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(error.message));
@@ -50,7 +51,11 @@ test("SSG landing, demo, local Monaco, download, image and binary previews", asy
   });
   const workers: string[] = [];
   page.on("worker", (worker) => workers.push(worker.url()));
-  await page.route("https://**/*", (route) => route.abort());
+  await page.route("https://**/*", (route) => {
+    if (new URL(route.request().url()).origin === new URL(baseURL!).origin)
+      return route.continue();
+    return route.abort();
+  });
   await page.goto("./");
   await expect(
     page.getByRole("heading", { name: "把 ASAR 文件拖到这里" }),
@@ -64,6 +69,9 @@ test("SSG landing, demo, local Monaco, download, image and binary previews", asy
     .click();
   await expect(page.locator(".monaco-editor")).toBeVisible();
   await expect(page.locator(".view-lines")).toContainText("hello-electron");
+  await expect
+    .poll(() => workers.length, { timeout: 15_000 })
+    .toBeGreaterThan(0);
   await page.screenshot({ path: "test-results/preview.png", fullPage: true });
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "下载", exact: true }).click();
