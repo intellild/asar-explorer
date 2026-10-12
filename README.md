@@ -32,11 +32,11 @@ Monaco 按需加载；文本预览上限为 2 MiB，图片预览上限为 20 MiB
 
 ## GitHub Pages
 
-`.github/workflows/deploy.yml` 在 `main` 分支推送或手动触发时执行测试、SSG 构建、浏览器测试并发布 `dist/client`。仅构建阶段使用 SSR，线上是静态站点。
+`.github/workflows/deploy.yml` 仅支持手动触发，执行测试、SSG 构建、浏览器测试并发布 `dist/client`。推送代码不会自动部署。仅构建阶段使用 SSR，线上是静态站点。
 
 1. 将项目推送到目标 GitHub 仓库的 `main` 分支。
 2. 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
-3. 在 Actions 中运行 **Deploy GitHub Pages**。
+3. 打开 **Actions → Deploy GitHub Pages → Run workflow**，选择 `main` 分支并手动运行。
 
 工作流根据仓库名称计算 github.io 子路径，构建与测试不依赖 Pages 是否已启用。部署阶段通过 `actions/configure-pages` 检查 Pages 设置。例如 `owner/asar-explorer` 会使用 `/asar-explorer/`，而 `owner/owner.github.io` 会使用 `/`。本地可用同样的配置验证项目站点：
 
